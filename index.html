@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestor Freelance</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">GF</div>
+      <div><strong>Gestor Freelance</strong><small>Local · simple</small></div>
+    </div>
+
+    <button class="btn primary full" id="newProjectBtn">+ Proyecto</button>
+
+    <div class="side-label">PROYECTOS</div>
+    <div id="projectNav" class="project-nav"></div>
+
+    <div class="sidebar-bottom">
+      <button class="btn dark full" id="teamBtn">👥 Colaboradores</button>
+      <button class="btn dark full" id="backupBtn">⬇ Respaldar JSON</button>
+      <label class="btn dark full file-btn">⬆ Restaurar JSON<input type="file" id="restoreInput" accept=".json"></label>
+    </div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">GESTIÓN PERSONAL</p>
+        <h1 id="pageTitle">Resumen</h1>
+      </div>
+      <button class="btn" id="dashboardBtn">Resumen general</button>
+    </header>
+
+    <section id="dashboardView">
+      <div class="stats">
+        <article><span>Proyectos</span><strong id="dashProjects">0</strong></article>
+        <article><span>Avance ponderado</span><strong id="dashProgress">0%</strong></article>
+        <article><span>Por cobrar</span><strong id="dashReceivable">$0.00</strong></article>
+        <article><span>Por pagar tareas</span><strong id="dashPayable">$0.00</strong></article>
+      </div>
+      <div class="section-head">
+        <div><p class="eyebrow">PANORAMA</p><h2>Proyectos</h2></div>
+      </div>
+      <div id="projectCards" class="cards"></div>
+    </section>
+
+    <section id="projectView" class="hidden">
+      <div class="project-header panel">
+        <div class="title-row">
+          <div>
+            <p class="eyebrow">PROYECTO</p>
+            <h2 id="projectName"></h2>
+            <p class="muted" id="projectNotes"></p>
+          </div>
+          <div class="actions">
+            <button class="btn" id="editProjectBtn">Editar</button>
+            <button class="btn danger-soft" id="deleteProjectBtn">Eliminar</button>
+          </div>
+        </div>
+
+        <div class="big-progress">
+          <div class="progress-label"><span>Avance por esfuerzo</span><strong id="projectProgressText">0%</strong></div>
+          <div class="track"><div class="bar" id="projectProgressBar"></div></div>
+          <small class="muted">Cada tarea tiene un peso de 1, 2, 3, 5 u 8 puntos. Una tarea grande pesa más que una pequeña.</small>
+        </div>
+      </div>
+
+      <div class="stats project-stats">
+        <article><span>Valor proyecto</span><strong id="finTotal">$0.00</strong></article>
+        <article><span>Recibido</span><strong id="finReceived">$0.00</strong></article>
+        <article><span>Cliente debe</span><strong id="finDue">$0.00</strong></article>
+        <article><span>Debes por tareas</span><strong id="finTaskDue">$0.00</strong></article>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="tasks">Tareas</button>
+        <button class="tab" data-tab="payments">Pagos</button>
+      </div>
+
+      <div id="tasksTab">
+        <div class="toolbar">
+          <div class="tools">
+            <button class="btn primary" id="newTaskBtn">+ Tarea</button>
+            <label class="btn file-btn">⬆ Cargar TXT<input type="file" id="taskTxtInput" accept=".txt"></label>
+            <button class="btn" id="templateBtn">Plantilla TXT</button>
+          </div>
+          <div class="filters">
+            <select id="areaFilter"></select>
+            <select id="statusFilter">
+              <option value="all">Todos los estados</option>
+              <option value="pending">Pendiente</option>
+              <option value="progress">En desarrollo</option>
+              <option value="review">Revisión</option>
+              <option value="done">Terminada</option>
+            </select>
+            <input id="taskSearch" placeholder="Buscar tarea...">
+          </div>
+        </div>
+
+        <div id="taskChips" class="chips"></div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tarea</th><th>Área</th><th>Responsable</th><th>Estado</th>
+                <th>Esfuerzo</th><th>Avance</th><th>Costo</th><th>Pagado</th><th>Debes</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="taskBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="paymentsTab" class="hidden">
+        <div class="toolbar">
+          <div class="tools"><button class="btn primary" id="newPaymentBtn">+ Registrar pago</button></div>
+        </div>
+        <div class="payment-help panel">
+          <strong>Cómo usar pagos</strong>
+          <p>Registra aquí tanto lo que <b>te paga el cliente</b> como lo que <b>tú pagas</b>. Si un pago a un developer corresponde a una tarea, enlázalo con esa tarea para descontarlo automáticamente de “Debes”.</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Persona / concepto</th><th>Tarea</th><th>Monto</th><th>Nota</th><th></th></tr></thead>
+            <tbody id="paymentBody"></tbody>
+          </table>
+        </div>
+        <div id="paymentEmpty" class="empty">Todavía no hay movimientos de dinero en este proyecto.</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal hidden" id="projectModal">
+  <div class="modal-card">
+    <div class="modal-title"><div><p class="eyebrow">PROYECTO</p><h3 id="projectModalTitle">Proyecto</h3></div><button data-close="projectModal">×</button></div>
+    <form id="projectForm">
+      <input type="hidden" id="projectIdInput">
+      <label>Nombre<input id="projectNameInput" required></label>
+      <label>Cliente<input id="projectClientInput"></label>
+      <label>Valor total ($)<input id="projectTotalInput" type="number" step="0.01" min="0"></label>
+      <label>Notas<textarea id="projectNotesInput"></textarea></label>
+      <div class="modal-actions"><button type="button" class="btn" data-close="projectModal">Cancelar</button><button class="btn primary">Guardar</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal hidden" id="taskModal">
+  <div class="modal-card wide">
+    <div class="modal-title"><div><p class="eyebrow">TAREA</p><h3 id="taskModalTitle">Tarea</h3></div><button data-close="taskModal">×</button></div>
+    <form id="taskForm">
+      <input type="hidden" id="taskIdInput">
+      <label>Tarea<input id="taskTitleInput" required></label>
+      <label>Descripción<textarea id="taskDescriptionInput"></textarea></label>
+      <div class="grid2">
+        <label>Área<input id="taskAreaInput" placeholder="Ej. Backend"></label>
+        <label>Responsable<select id="taskAssigneeInput"></select></label>
+      </div>
+      <div class="grid3">
+        <label>Estado<select id="taskStatusInput">
+          <option value="pending">Pendiente</option><option value="progress">En desarrollo</option>
+          <option value="review">Revisión</option><option value="done">Terminada</option>
+        </select></label>
+        <label>Avance<select id="taskProgressInput">
+          <option value="0">0%</option><option value="25">25%</option><option value="50">50%</option>
+          <option value="75">75%</option><option value="100">100%</option>
+        </select></label>
+        <label>Esfuerzo<select id="taskEffortInput">
+          <option value="1">1 · Muy pequeña</option><option value="2">2 · Pequeña</option>
+          <option value="3">3 · Media</option><option value="5">5 · Grande</option><option value="8">8 · Muy grande</option>
+        </select></label>
+      </div>
+      <div class="grid2">
+        <label>Fecha límite<input id="taskDateInput" type="date"></label>
+        <label>Costo acordado ($)<input id="taskCostInput" type="number" step="0.01" min="0"></label>
+      </div>
+      <label>Notas<textarea id="taskNotesInput"></textarea></label>
+      <div class="modal-actions">
+        <button type="button" class="btn danger-soft hidden" id="deleteTaskBtn">Eliminar</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn" data-close="taskModal">Cancelar</button>
+        <button class="btn primary">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal hidden" id="paymentModal">
+  <div class="modal-card">
+    <div class="modal-title"><div><p class="eyebrow">DINERO</p><h3>Registrar pago</h3></div><button data-close="paymentModal">×</button></div>
+    <form id="paymentForm">
+      <label>Tipo<select id="paymentTypeInput">
+        <option value="income">Me pagaron</option>
+        <option value="expense">Yo pagué</option>
+      </select></label>
+      <div class="grid2">
+        <label>Monto ($)<input id="paymentAmountInput" type="number" min="0.01" step="0.01" required></label>
+        <label>Fecha<input id="paymentDateInput" type="date" required></label>
+      </div>
+      <label>Persona / concepto<input id="paymentPartyInput" placeholder="Ej. Cliente / Juan / Hosting"></label>
+      <label id="paymentTaskLabel">Relacionar con tarea<select id="paymentTaskInput"></select></label>
+      <label>Nota<textarea id="paymentNoteInput"></textarea></label>
+      <div class="modal-actions"><button type="button" class="btn" data-close="paymentModal">Cancelar</button><button class="btn primary">Registrar</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="modal hidden" id="teamModal">
+  <div class="modal-card">
+    <div class="modal-title"><div><p class="eyebrow">EQUIPO</p><h3>Colaboradores</h3></div><button data-close="teamModal">×</button></div>
+    <form id="teamForm" class="inline"><input id="teamNameInput" placeholder="Nombre" required><button class="btn primary">Agregar</button></form>
+    <div id="teamList" class="team-list"></div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+<script src="seed-data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
