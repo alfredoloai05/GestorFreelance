@@ -1,0 +1,10 @@
+# PLANTILLA DE TAREAS
+# Formato:
+# Tarea | Descripción | Costo
+#
+# Todas se importan pendientes, al 0%, sin responsable,
+# área "General" y esfuerzo inicial 3.
+
+Crear login | Implementar autenticación | 0
+Crear dashboard | Mostrar resumen del proyecto | 0
+Revisión responsive | Validar móvil y escritorio | 0
