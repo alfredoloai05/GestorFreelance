@@ -1,0 +1,1 @@
+El acceso actual es una barrera visual implementada en el navegador. Al estar el repositorio y los archivos publicados, las credenciales pueden descubrirse inspeccionando el código. No debe considerarse autenticación segura.
