@@ -5,8 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestor Freelance</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="auth.css">
 </head>
 <body>
+<div class="login-gate" id="loginGate">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="logo">GF</div>
+      <div><strong>Gestor Freelance</strong><small>Acceso personal</small></div>
+    </div>
+    <p class="eyebrow">ACCESO</p>
+    <h1>Bienvenido</h1>
+    <p class="muted login-copy">Ingresa tus credenciales para abrir el gestor.</p>
+    <form id="loginForm">
+      <label>Usuario<input id="loginUser" autocomplete="username" required></label>
+      <label>Clave<input id="loginPassword" type="password" autocomplete="current-password" required></label>
+      <p class="login-error hidden" id="loginError">Usuario o clave incorrectos.</p>
+      <button class="btn primary full" type="submit">Ingresar</button>
+    </form>
+  </div>
+</div>
+
 <div class="app">
   <aside class="sidebar">
     <div class="brand">
@@ -23,6 +42,7 @@
       <button class="btn dark full" id="teamBtn">👥 Colaboradores</button>
       <button class="btn dark full" id="backupBtn">⬇ Respaldar JSON</button>
       <label class="btn dark full file-btn">⬆ Restaurar JSON<input type="file" id="restoreInput" accept=".json"></label>
+      <button class="btn dark full" id="logoutBtn">↪ Cerrar sesión</button>
     </div>
   </aside>
 
@@ -231,5 +251,6 @@
 <script src="data/ind_2.js"></script>
 <script src="seed-data.js"></script>
 <script src="app.js"></script>
+<script src="auth.js"></script>
 </body>
 </html>
