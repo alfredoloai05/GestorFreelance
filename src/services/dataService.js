@@ -29,6 +29,7 @@ const applyKnownCorrections = (data) => {
           ...payment,
           id: 'payment_riosac_received_850',
           amount: 850,
+          date: '',
           note: 'Primer pago recibido del proyecto.',
         };
       }
