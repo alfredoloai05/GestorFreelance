@@ -88,7 +88,7 @@ export const mockData = {
           id: 'payment_riosac_received_850',
           type: 'income',
           amount: 850,
-          date: '2026-08-11',
+          date: '',
           party: 'RIOSAC',
           taskId: '',
           note: 'Primer pago recibido del proyecto.',
