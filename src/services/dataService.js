@@ -4,20 +4,49 @@ const STORAGE_KEY = 'gestor_freelance_v2';
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
 const normalize = (data) => ({
-  version: 4,
+  version: 5,
   collaborators: Array.isArray(data?.collaborators) ? data.collaborators : ['Alfredo Loaiza'],
   projects: Array.isArray(data?.projects)
     ? data.projects.map((project) => ({
         ...project,
         status: project.status || 'active',
-        tasks: Array.isArray(project.tasks) ? project.tasks : [],
+        tasks: Array.isArray(project.tasks)
+          ? project.tasks.map((task) => ({ ...task, priority: task.priority || 'medium' }))
+          : [],
         payments: Array.isArray(project.payments) ? project.payments : [],
       }))
     : [],
 });
 
+const applyKnownCorrections = (data) => {
+  const normalized = normalize(data);
+  normalized.projects = normalized.projects.map((project) => {
+    if (project.id !== 'project_riosac_v2') return project;
+
+    const payments = (project.payments || []).map((payment) => {
+      if (payment.id === 'payment_riosac_received_1200') {
+        return {
+          ...payment,
+          id: 'payment_riosac_received_850',
+          amount: 850,
+          note: 'Primer pago recibido del proyecto.',
+        };
+      }
+      return payment;
+    });
+
+    return {
+      ...project,
+      total: Number(project.total) === 1600 ? 1250 : project.total,
+      payments,
+    };
+  });
+  normalized.version = 5;
+  return normalized;
+};
+
 const mergeSeededProjects = (savedData) => {
-  const normalized = normalize(savedData);
+  const normalized = applyKnownCorrections(savedData);
   const existingIds = new Set(normalized.projects.map((project) => project.id));
   const missingProjects = mockData.projects
     .filter((project) => !existingIds.has(project.id))
@@ -30,7 +59,7 @@ const mergeSeededProjects = (savedData) => {
   const collaborators = new Set(normalized.collaborators);
   mockData.collaborators.forEach((collaborator) => collaborators.add(collaborator));
   normalized.collaborators = [...collaborators];
-  normalized.version = 4;
+  normalized.version = 5;
   return normalized;
 };
 
