@@ -17,6 +17,7 @@ const buildTasks = (rows, prefix) => rows.map((row, index) => ({
   status: 'pending',
   progress: 0,
   effort: row[3] || 3,
+  priority: 'medium',
   assignee: '',
   dueDate: '',
   cost: 0,
@@ -51,7 +52,7 @@ const classesTasks = [
 ];
 
 export const mockData = {
-  version: 4,
+  version: 5,
   collaborators: ['Alfredo Loaiza'],
   projects: [
     {
@@ -78,19 +79,19 @@ export const mockData = {
       id: 'project_riosac_v2',
       name: 'RIOSAC V2',
       client: 'RIOSAC',
-      total: 1600,
+      total: 1250,
       status: 'active',
       notes: 'Segunda etapa del sistema RIOSAC. Se muestran únicamente los pendientes actuales.',
       tasks: buildTasks(riosacTasks, 'riosac'),
       payments: [
         {
-          id: 'payment_riosac_received_1200',
+          id: 'payment_riosac_received_850',
           type: 'income',
-          amount: 1200,
+          amount: 850,
           date: '2026-08-11',
           party: 'RIOSAC',
           taskId: '',
-          note: 'Valor recibido acumulado del proyecto.',
+          note: 'Primer pago recibido del proyecto.',
         },
       ],
     },
