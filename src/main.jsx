@@ -5,6 +5,7 @@ import './styles.css';
 import './enhancements.css';
 import './riskEnhancer.css';
 import './riskEnhancer';
+import './FinancePortal';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
