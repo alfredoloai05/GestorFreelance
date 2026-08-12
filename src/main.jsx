@@ -4,7 +4,6 @@ import App from './App';
 import SupabaseGate from './SupabaseGate';
 import './styles.css';
 import './enhancements.css';
-import './riskEnhancer.css';
 import './projectPolish.css';
 import './FinancePortal';
 
