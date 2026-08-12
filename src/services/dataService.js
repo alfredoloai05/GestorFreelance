@@ -1,100 +1,238 @@
 import { mockData } from '../data/mockData';
+import { supabase } from './supabaseClient';
 
-const STORAGE_KEY = 'gestor_freelance_v2';
 const clone = (value) => JSON.parse(JSON.stringify(value));
+let saveTimer = null;
+let pendingSave = null;
 
-const normalize = (data) => ({
-  version: 5,
-  collaborators: Array.isArray(data?.collaborators) ? data.collaborators : ['Alfredo Loaiza'],
-  projects: Array.isArray(data?.projects)
-    ? data.projects.map((project) => ({
-        ...project,
-        status: project.status || 'active',
-        tasks: Array.isArray(project.tasks)
-          ? project.tasks.map((task) => ({ ...task, priority: task.priority || 'medium' }))
-          : [],
-        payments: Array.isArray(project.payments) ? project.payments : [],
-      }))
-    : [],
-});
-
-const applyKnownCorrections = (data) => {
-  const normalized = normalize(data);
-  normalized.projects = normalized.projects.map((project) => {
-    if (project.id !== 'project_riosac_v2') return project;
-
-    const payments = (project.payments || []).map((payment) => {
-      if (payment.id === 'payment_riosac_received_1200') {
-        return {
-          ...payment,
-          id: 'payment_riosac_received_850',
-          amount: 850,
-          date: '',
-          note: 'Primer pago recibido del proyecto.',
-        };
-      }
-      return payment;
-    });
-
-    return {
-      ...project,
-      total: Number(project.total) === 1600 ? 1250 : project.total,
-      payments,
-    };
-  });
-  normalized.version = 5;
-  return normalized;
+const getUser = async () => {
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  if (!user) throw new Error('No hay una sesión activa de Supabase.');
+  return user;
 };
 
-const mergeSeededProjects = (savedData) => {
-  const normalized = applyKnownCorrections(savedData);
-  const existingIds = new Set(normalized.projects.map((project) => project.id));
-  const missingProjects = mockData.projects
-    .filter((project) => !existingIds.has(project.id))
-    .map((project) => clone(project));
+const fetchWorkspace = async (ownerId) => {
+  const [collaboratorsRes, projectsRes, areasRes, tasksRes, paymentsRes] = await Promise.all([
+    supabase.from('collaborators').select('*').eq('owner_id', ownerId).order('created_at'),
+    supabase.from('projects').select('*').eq('owner_id', ownerId).order('created_at'),
+    supabase.from('project_areas').select('*').eq('owner_id', ownerId).order('sort_order'),
+    supabase.from('tasks').select('*').eq('owner_id', ownerId).order('created_at'),
+    supabase.from('project_payments').select('*').eq('owner_id', ownerId).order('paid_at'),
+  ]);
 
-  if (missingProjects.length) {
-    normalized.projects.push(...missingProjects);
+  for (const result of [collaboratorsRes, projectsRes, areasRes, tasksRes, paymentsRes]) {
+    if (result.error) throw result.error;
   }
 
-  const collaborators = new Set(normalized.collaborators);
-  mockData.collaborators.forEach((collaborator) => collaborators.add(collaborator));
-  normalized.collaborators = [...collaborators];
-  normalized.version = 5;
-  return normalized;
+  const collaborators = collaboratorsRes.data || [];
+  const projects = projectsRes.data || [];
+  const areas = areasRes.data || [];
+  const tasks = tasksRes.data || [];
+  const payments = paymentsRes.data || [];
+  const collaboratorById = new Map(collaborators.map((item) => [item.id, item.name]));
+  const areaById = new Map(areas.map((item) => [item.id, item.name]));
+  const taskKeyById = new Map(tasks.map((item) => [item.id, item.client_key || item.id]));
+
+  return {
+    version: 6,
+    collaborators: collaborators.map((item) => item.name),
+    projects: projects.map((project) => ({
+      id: project.client_key || project.id,
+      name: project.name,
+      client: project.client_name || '',
+      total: Number(project.total_value || 0),
+      status: project.status || 'active',
+      notes: project.description || '',
+      dueDate: project.delivery_date || '',
+      tasks: tasks
+        .filter((task) => task.project_id === project.id)
+        .map((task) => ({
+          id: task.client_key || task.id,
+          title: task.title,
+          description: task.description || '',
+          area: areaById.get(task.area_id) || 'General',
+          status: task.status || 'pending',
+          priority: task.priority || 'medium',
+          progress: Number(task.progress || 0),
+          effort: Number(task.effort || 3),
+          assignee: collaboratorById.get(task.assignee_id) || '',
+          dueDate: task.target_date || '',
+          cost: Number(task.cost || 0),
+          notes: task.notes || '',
+        })),
+      payments: payments
+        .filter((payment) => payment.project_id === project.id)
+        .map((payment) => ({
+          id: payment.client_key || payment.id,
+          type: payment.type,
+          amount: Number(payment.amount || 0),
+          date: payment.paid_at ? String(payment.paid_at).slice(0, 10) : '',
+          party: payment.concept || '',
+          taskId: payment.task_id ? taskKeyById.get(payment.task_id) || '' : '',
+          note: payment.notes || '',
+        })),
+    })),
+  };
+};
+
+const deleteMissing = async (table, ownerId, currentKeys) => {
+  const { data, error } = await supabase.from(table).select('id,client_key').eq('owner_id', ownerId);
+  if (error) throw error;
+  const wanted = new Set(currentKeys.filter(Boolean));
+  const stale = (data || []).filter((row) => row.client_key && !wanted.has(row.client_key)).map((row) => row.id);
+  if (stale.length) {
+    const result = await supabase.from(table).delete().in('id', stale);
+    if (result.error) throw result.error;
+  }
+};
+
+const persistWorkspace = async (data) => {
+  const user = await getUser();
+  const ownerId = user.id;
+  const collaborators = [...new Set((data.collaborators || []).filter(Boolean))];
+
+  if (collaborators.length) {
+    const { error } = await supabase.from('collaborators').upsert(
+      collaborators.map((name) => ({ owner_id: ownerId, name, active: true })),
+      { onConflict: 'owner_id,name' },
+    );
+    if (error) throw error;
+  }
+
+  const { data: collaboratorRows, error: collaboratorError } = await supabase
+    .from('collaborators').select('id,name').eq('owner_id', ownerId);
+  if (collaboratorError) throw collaboratorError;
+  const collaboratorId = new Map((collaboratorRows || []).map((row) => [row.name, row.id]));
+
+  const projects = data.projects || [];
+  if (projects.length) {
+    const { error } = await supabase.from('projects').upsert(
+      projects.map((project) => ({
+        owner_id: ownerId,
+        client_key: project.id,
+        name: project.name,
+        client_name: project.client || null,
+        description: project.notes || null,
+        total_value: Number(project.total || 0),
+        status: project.status || 'active',
+        delivery_date: project.dueDate || null,
+        updated_at: new Date().toISOString(),
+      })),
+      { onConflict: 'owner_id,client_key' },
+    );
+    if (error) throw error;
+  }
+  await deleteMissing('projects', ownerId, projects.map((project) => project.id));
+
+  const { data: projectRows, error: projectError } = await supabase
+    .from('projects').select('id,client_key').eq('owner_id', ownerId);
+  if (projectError) throw projectError;
+  const projectId = new Map((projectRows || []).map((row) => [row.client_key, row.id]));
+
+  const areaRows = [];
+  for (const project of projects) {
+    const dbProjectId = projectId.get(project.id);
+    const names = [...new Set((project.tasks || []).map((task) => task.area || 'General'))];
+    names.forEach((name, index) => areaRows.push({ owner_id: ownerId, project_id: dbProjectId, name, sort_order: index }));
+  }
+  if (areaRows.length) {
+    const { error } = await supabase.from('project_areas').upsert(areaRows, { onConflict: 'project_id,name' });
+    if (error) throw error;
+  }
+  const { data: areaData, error: areaError } = await supabase
+    .from('project_areas').select('id,project_id,name').eq('owner_id', ownerId);
+  if (areaError) throw areaError;
+  const areaId = new Map((areaData || []).map((row) => [`${row.project_id}::${row.name}`, row.id]));
+
+  const taskRows = [];
+  for (const project of projects) {
+    const dbProjectId = projectId.get(project.id);
+    for (const task of project.tasks || []) {
+      taskRows.push({
+        owner_id: ownerId,
+        client_key: task.id,
+        project_id: dbProjectId,
+        area_id: areaId.get(`${dbProjectId}::${task.area || 'General'}`) || null,
+        assignee_id: task.assignee ? collaboratorId.get(task.assignee) || null : null,
+        title: task.title,
+        description: task.description || null,
+        status: task.status || 'pending',
+        priority: task.priority || 'medium',
+        progress: Number(task.progress || 0),
+        effort: Number(task.effort || 3),
+        cost: Number(task.cost || 0),
+        target_date: task.dueDate || null,
+        notes: task.notes || null,
+        updated_at: new Date().toISOString(),
+      });
+    }
+  }
+  if (taskRows.length) {
+    const { error } = await supabase.from('tasks').upsert(taskRows, { onConflict: 'owner_id,client_key' });
+    if (error) throw error;
+  }
+  await deleteMissing('tasks', ownerId, taskRows.map((task) => task.client_key));
+
+  const { data: taskData, error: taskError } = await supabase
+    .from('tasks').select('id,client_key').eq('owner_id', ownerId);
+  if (taskError) throw taskError;
+  const taskId = new Map((taskData || []).map((row) => [row.client_key, row.id]));
+
+  const paymentRows = [];
+  for (const project of projects) {
+    const dbProjectId = projectId.get(project.id);
+    for (const payment of project.payments || []) {
+      paymentRows.push({
+        owner_id: ownerId,
+        client_key: payment.id,
+        project_id: dbProjectId,
+        task_id: payment.taskId ? taskId.get(payment.taskId) || null : null,
+        type: payment.type,
+        amount: Number(payment.amount || 0),
+        paid_at: payment.date ? `${payment.date}T12:00:00` : null,
+        concept: payment.party || null,
+        notes: payment.note || null,
+        updated_at: new Date().toISOString(),
+      });
+    }
+  }
+  if (paymentRows.length) {
+    const { error } = await supabase.from('project_payments').upsert(paymentRows, { onConflict: 'owner_id,client_key' });
+    if (error) throw error;
+  }
+  await deleteMissing('project_payments', ownerId, paymentRows.map((payment) => payment.client_key));
+};
+
+const seedIfEmpty = async (ownerId) => {
+  const { count, error } = await supabase
+    .from('projects').select('id', { count: 'exact', head: true }).eq('owner_id', ownerId);
+  if (error) throw error;
+  if (count) return;
+  await persistWorkspace(clone(mockData));
 };
 
 export const dataService = {
   async load() {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const migrated = mergeSeededProjects(JSON.parse(saved));
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-        return migrated;
-      }
-    } catch (error) {
-      console.warn('No se pudo leer el almacenamiento local', error);
-    }
-
-    const initial = clone(mockData);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-    return initial;
+    const user = await getUser();
+    await seedIfEmpty(user.id);
+    return fetchWorkspace(user.id);
   },
 
   async save(data) {
-    const normalized = normalize(data);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-    return normalized;
+    pendingSave = clone(data);
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      const snapshot = pendingSave;
+      pendingSave = null;
+      try {
+        await persistWorkspace(snapshot);
+      } catch (error) {
+        console.error('No se pudo sincronizar el workspace con Supabase', error);
+      }
+    }, 650);
+    return data;
   },
 
-  async reset() {
-    const initial = clone(mockData);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
-    return initial;
-  },
-
-  // La interfaz permanece estable. Al conectar Supabase cambiaremos
-  // esta implementación sin rehacer los componentes React.
-  provider: 'local',
+  provider: 'supabase',
 };
