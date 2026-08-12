@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from './services/supabaseClient';
 
-const LEGACY_AUTH_KEY = 'gestor_freelance_auth_v1';
-
 export default function SupabaseGate({ children }) {
   const [session, setSession] = useState(undefined);
   const [email, setEmail] = useState('');
@@ -13,15 +11,10 @@ export default function SupabaseGate({ children }) {
   useEffect(() => {
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      if (data.session) localStorage.setItem(LEGACY_AUTH_KEY, 'ok');
-      else localStorage.removeItem(LEGACY_AUTH_KEY);
-      setSession(data.session || null);
+      if (mounted) setSession(data.session || null);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (nextSession) localStorage.setItem(LEGACY_AUTH_KEY, 'ok');
-      else localStorage.removeItem(LEGACY_AUTH_KEY);
       setSession(nextSession || null);
     });
 
@@ -64,6 +57,5 @@ export default function SupabaseGate({ children }) {
     </div>;
   }
 
-  localStorage.setItem(LEGACY_AUTH_KEY, 'ok');
   return children;
 }
