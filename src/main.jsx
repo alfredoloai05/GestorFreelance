@@ -5,7 +5,7 @@ import SupabaseGate from './SupabaseGate';
 import './styles.css';
 import './enhancements.css';
 import './riskEnhancer.css';
-import './riskEnhancer';
+import './projectPolish.css';
 import './FinancePortal';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
