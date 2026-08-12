@@ -1,7 +1,7 @@
 import { mockData } from '../data/mockData';
 import { supabase } from './supabaseClient';
 
-const clone = (value) => JSON.parse(JSON.stringify(value));
+const clone = (value) => structuredClone(value);
 let saveTimer = null;
 let pendingSave = null;
 
@@ -87,6 +87,17 @@ const deleteMissing = async (table, ownerId, currentKeys) => {
   }
 };
 
+const deleteMissingCollaborators = async (ownerId, names) => {
+  const { data, error } = await supabase.from('collaborators').select('id,name').eq('owner_id', ownerId);
+  if (error) throw error;
+  const wanted = new Set(names);
+  const stale = (data || []).filter((row) => !wanted.has(row.name)).map((row) => row.id);
+  if (stale.length) {
+    const result = await supabase.from('collaborators').delete().in('id', stale);
+    if (result.error) throw result.error;
+  }
+};
+
 const persistWorkspace = async (data) => {
   const user = await getUser();
   const ownerId = user.id;
@@ -99,6 +110,7 @@ const persistWorkspace = async (data) => {
     );
     if (error) throw error;
   }
+  await deleteMissingCollaborators(ownerId, collaborators);
 
   const { data: collaboratorRows, error: collaboratorError } = await supabase
     .from('collaborators').select('id,name').eq('owner_id', ownerId);
@@ -204,18 +216,25 @@ const persistWorkspace = async (data) => {
   await deleteMissing('project_payments', ownerId, paymentRows.map((payment) => payment.client_key));
 };
 
-const seedIfEmpty = async (ownerId) => {
+const seedIfNeeded = async (ownerId) => {
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles').select('workspace_initialized').eq('owner_id', ownerId).maybeSingle();
+  if (profileError) throw profileError;
+  if (profile?.workspace_initialized) return;
+
   const { count, error } = await supabase
     .from('projects').select('id', { count: 'exact', head: true }).eq('owner_id', ownerId);
   if (error) throw error;
-  if (count) return;
-  await persistWorkspace(clone(mockData));
+  if (!count) await persistWorkspace(clone(mockData));
+
+  const result = await supabase.from('profiles').upsert({ owner_id: ownerId, workspace_initialized: true }, { onConflict: 'owner_id' });
+  if (result.error) throw result.error;
 };
 
 export const dataService = {
   async load() {
     const user = await getUser();
-    await seedIfEmpty(user.id);
+    await seedIfNeeded(user.id);
     return fetchWorkspace(user.id);
   },
 
