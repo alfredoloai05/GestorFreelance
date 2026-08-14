@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { supabase } from './services/supabaseClient';
 
 const money = (value) => new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(value || 0));
 const dayKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -8,7 +9,7 @@ const dayDiff = (date) => {
   const target = new Date(`${date}T12:00:00`);
   return Math.round((target - today) / 86400000);
 };
-const uid = () => `note_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+const uid = (prefix = 'note') => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
 function buildBriefing(data) {
   const projects = (data.projects || []).filter((project) => project.status !== 'archived');
@@ -35,19 +36,76 @@ function buildBriefing(data) {
   return lines.slice(0, 5);
 }
 
-export default function BriefingInbox({ data, onProject, onAdd, onArchive, onConvert }) {
+export default function BriefingInbox({ data, onProject }) {
   const [content, setContent] = useState('');
   const [projectId, setProjectId] = useState('');
-  const briefing = useMemo(() => buildBriefing(data), [data]);
-  const notes = useMemo(() => (data.inbox || []).filter((note) => note.status !== 'archived'), [data.inbox]);
-  const submit = (event) => {
+  const [notes, setNotes] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: rows, error: loadError } = await supabase.from('inbox_notes').select('id,client_key,content,status,project_id,created_at').eq('owner_id', user.id).eq('status', 'inbox').order('created_at', { ascending: false });
+      if (loadError) { if (alive) setError('No pude cargar tu Inbox.'); return; }
+      const { data: projectRows } = await supabase.from('projects').select('id,client_key').eq('owner_id', user.id);
+      const keyByDbId = new Map((projectRows || []).map((row) => [row.id, row.client_key || row.id]));
+      if (alive) setNotes((rows || []).map((row) => ({ id: row.client_key || row.id, dbId: row.id, content: row.content, status: row.status, projectId: row.project_id ? keyByDbId.get(row.project_id) || '' : '', createdAt: row.created_at })));
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  const briefing = useMemo(() => buildBriefing({ ...data, inbox: notes }), [data, notes]);
+  const projectName = (id) => data.projects.find((project) => project.id === id)?.name || '';
+
+  const getProjectDbId = async (userId, clientKey) => {
+    if (!clientKey) return null;
+    const { data: row, error: projectError } = await supabase.from('projects').select('id').eq('owner_id', userId).eq('client_key', clientKey).maybeSingle();
+    if (projectError) throw projectError;
+    return row?.id || null;
+  };
+
+  const submit = async (event) => {
     event.preventDefault();
     const text = content.trim();
-    if (!text) return;
-    onAdd({ id: uid(), content: text, projectId, status: 'inbox', createdAt: new Date().toISOString() });
-    setContent('');
+    if (!text || saving) return;
+    setSaving(true); setError('');
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Sesión no disponible');
+      const clientKey = uid();
+      const dbProjectId = await getProjectDbId(user.id, projectId);
+      const { data: row, error: insertError } = await supabase.from('inbox_notes').insert({ owner_id: user.id, client_key: clientKey, content: text, project_id: dbProjectId, status: 'inbox' }).select('id,created_at').single();
+      if (insertError) throw insertError;
+      setNotes((current) => [{ id: clientKey, dbId: row.id, content: text, projectId, status: 'inbox', createdAt: row.created_at }, ...current]);
+      setContent('');
+    } catch (saveError) { console.error(saveError); setError('No pude guardar esta nota.'); }
+    finally { setSaving(false); }
   };
-  const projectName = (id) => data.projects.find((project) => project.id === id)?.name || '';
+
+  const archive = async (note) => {
+    setError('');
+    const { error: archiveError } = await supabase.from('inbox_notes').update({ status: 'archived', updated_at: new Date().toISOString() }).eq('id', note.dbId);
+    if (archiveError) { setError('No pude archivar la nota.'); return; }
+    setNotes((current) => current.filter((item) => item.id !== note.id));
+  };
+
+  const convert = async (note) => {
+    if (!note.projectId) return;
+    setSaving(true); setError('');
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Sesión no disponible');
+      const dbProjectId = await getProjectDbId(user.id, note.projectId);
+      if (!dbProjectId) throw new Error('Proyecto no encontrado');
+      const { error: taskError } = await supabase.from('tasks').insert({ owner_id: user.id, client_key: uid('task'), project_id: dbProjectId, title: note.content, status: 'pending', priority: 'medium', progress: 0, effort: 3, cost: 0 });
+      if (taskError) throw taskError;
+      await archive(note);
+      window.location.reload();
+    } catch (convertError) { console.error(convertError); setError('No pude convertir esta nota en tarea.'); setSaving(false); }
+  };
 
   return <section className="jarvis-grid">
     <article className="jarvis-briefing">
@@ -60,11 +118,12 @@ export default function BriefingInbox({ data, onProject, onAdd, onArchive, onCon
       <div className="jarvis-head"><div><span>INBOX RÁPIDO</span><h3>Sácalo de tu cabeza.</h3></div><b>{notes.length}</b></div>
       <form className="jarvis-capture" onSubmit={submit}>
         <textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder="Ej. Revisar integración de pagos en Canchas..." rows="3"/>
-        <div><select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">Sin proyecto todavía</option>{data.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><button>Guardar nota</button></div>
+        <div><select value={projectId} onChange={(event) => setProjectId(event.target.value)}><option value="">Sin proyecto todavía</option>{data.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><button disabled={saving}>{saving ? 'Guardando…' : 'Guardar nota'}</button></div>
       </form>
+      {error && <p className="jarvis-inbox-error">{error}</p>}
       <div className="jarvis-note-list">{notes.slice(0, 5).map((note) => <div key={note.id} className="jarvis-note">
         <button className="jarvis-note-main" onClick={() => note.projectId && onProject(note.projectId)}><p>{note.content}</p><small>{note.projectId ? projectName(note.projectId) : 'Sin proyecto'}{note.createdAt ? ` · ${new Intl.DateTimeFormat('es-EC', { day: '2-digit', month: 'short' }).format(new Date(note.createdAt))}` : ''}</small></button>
-        <div className="jarvis-note-actions">{note.projectId && <button onClick={() => onConvert(note)}>→ Tarea</button>}<button onClick={() => onArchive(note.id)}>Archivar</button></div>
+        <div className="jarvis-note-actions">{note.projectId && <button onClick={() => convert(note)}>→ Tarea</button>}<button onClick={() => archive(note)}>Archivar</button></div>
       </div>)}{!notes.length && <div className="jarvis-inbox-empty">Tu Inbox está limpio. Cuando se te ocurra algo, déjalo aquí y sigue trabajando.</div>}</div>
     </article>
   </section>;
