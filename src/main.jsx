@@ -9,6 +9,7 @@ import './companyPolish.css';
 import './jarvisPolish.css';
 import './calendarPolish.css';
 import './projectModalPro.css';
+import './taskTablePolish.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
