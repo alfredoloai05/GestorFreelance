@@ -68,3 +68,5 @@ service = service.replace(
   "try {\n        emitSyncStatus('saving');\n        await persistWorkspace(snapshot);\n        emitSyncStatus('synced');\n      } catch (error) {\n        emitSyncStatus('error');\n        console.error('No se pudo sincronizar el workspace con Supabase', error);\n      }",
 );
 fs.writeFileSync(servicePath, service);
+
+// One-time repository patch used to wire the personal assistant UI.
