@@ -44,6 +44,7 @@ const fetchWorkspace = async (ownerId) => {
       client: project.client_name || '',
       total: Number(project.total_value || 0),
       status: project.status || 'active',
+      startDate: project.start_date || '',
       notes: project.description || '',
       dueDate: project.delivery_date || '',
       tasks: tasks
@@ -129,6 +130,7 @@ const persistWorkspace = async (data) => {
         description: project.notes || null,
         total_value: Number(project.total || 0),
         status: project.status || 'active',
+        start_date: project.startDate || null,
         delivery_date: project.dueDate || null,
         updated_at: new Date().toISOString(),
       })),
