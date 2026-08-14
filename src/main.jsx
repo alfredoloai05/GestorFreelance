@@ -5,7 +5,7 @@ import SupabaseGate from './SupabaseGate';
 import './styles.css';
 import './enhancements.css';
 import './projectPolish.css';
-import './FinancePortal';
+import './companyPolish.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
