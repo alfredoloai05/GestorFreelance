@@ -265,20 +265,6 @@ const persistWorkspace = async (data) => {
     if (error) throw error;
   }
   await deleteMissing('project_payments', ownerId, paymentRows.map((payment) => payment.client_key));
-
-  const inboxRows = (data.inbox || []).map((note) => ({
-    owner_id: ownerId,
-    client_key: note.id,
-    project_id: note.projectId ? projectId.get(note.projectId) || null : null,
-    content: note.content,
-    status: note.status || 'inbox',
-    updated_at: new Date().toISOString(),
-  }));
-  if (inboxRows.length) {
-    const { error } = await supabase.from('inbox_notes').upsert(inboxRows, { onConflict: 'owner_id,client_key' });
-    if (error) throw error;
-  }
-  await deleteMissing('inbox_notes', ownerId, inboxRows.map((note) => note.client_key));
 };
 
 const seedIfNeeded = async (ownerId) => {
