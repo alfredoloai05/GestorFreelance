@@ -7,6 +7,7 @@ import './enhancements.css';
 import './projectPolish.css';
 import './companyPolish.css';
 import './jarvisPolish.css';
+import './projectModalPro.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
