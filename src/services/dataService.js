@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient';
 const clone = (value) => structuredClone(value);
 let saveTimer = null;
 let pendingSave = null;
+let retryTimer = null;
 const emitSyncStatus = (status) => { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('vencodex-sync-status', { detail: status })); };
 
 const getUser = async () => {
@@ -14,15 +15,17 @@ const getUser = async () => {
 };
 
 const fetchWorkspace = async (ownerId) => {
-  const [collaboratorsRes, projectsRes, areasRes, tasksRes, paymentsRes] = await Promise.all([
+  const [collaboratorsRes, projectsRes, areasRes, tasksRes, paymentsRes, resourcesRes, inboxRes] = await Promise.all([
     supabase.from('collaborators').select('*').eq('owner_id', ownerId).order('created_at'),
     supabase.from('projects').select('*').eq('owner_id', ownerId).order('created_at'),
     supabase.from('project_areas').select('*').eq('owner_id', ownerId).order('sort_order'),
     supabase.from('tasks').select('*').eq('owner_id', ownerId).order('created_at'),
     supabase.from('project_payments').select('*').eq('owner_id', ownerId).order('paid_at'),
+    supabase.from('project_resources').select('*').eq('owner_id', ownerId).order('created_at'),
+    supabase.from('inbox_notes').select('*').eq('owner_id', ownerId).order('created_at', { ascending: false }),
   ]);
 
-  for (const result of [collaboratorsRes, projectsRes, areasRes, tasksRes, paymentsRes]) {
+  for (const result of [collaboratorsRes, projectsRes, areasRes, tasksRes, paymentsRes, resourcesRes, inboxRes]) {
     if (result.error) throw result.error;
   }
 
@@ -31,13 +34,23 @@ const fetchWorkspace = async (ownerId) => {
   const areas = areasRes.data || [];
   const tasks = tasksRes.data || [];
   const payments = paymentsRes.data || [];
+  const resources = resourcesRes.data || [];
+  const inbox = inboxRes.data || [];
   const collaboratorById = new Map(collaborators.map((item) => [item.id, item.name]));
   const areaById = new Map(areas.map((item) => [item.id, item.name]));
   const taskKeyById = new Map(tasks.map((item) => [item.id, item.client_key || item.id]));
+  const projectKeyById = new Map(projects.map((item) => [item.id, item.client_key || item.id]));
 
   return {
-    version: 6,
+    version: 7,
     collaborators: collaborators.map((item) => item.name),
+    inbox: inbox.map((item) => ({
+      id: item.client_key || item.id,
+      content: item.content,
+      projectId: item.project_id ? projectKeyById.get(item.project_id) || '' : '',
+      status: item.status || 'inbox',
+      createdAt: item.created_at || '',
+    })),
     projects: projects.map((project) => ({
       id: project.client_key || project.id,
       name: project.name,
@@ -47,6 +60,17 @@ const fetchWorkspace = async (ownerId) => {
       startDate: project.start_date || '',
       notes: project.description || '',
       dueDate: project.delivery_date || '',
+      resources: resources
+        .filter((resource) => resource.project_id === project.id)
+        .map((resource) => ({
+          id: resource.client_key || resource.id,
+          type: resource.resource_type || 'other',
+          label: resource.label,
+          url: resource.url || '',
+          username: resource.username || '',
+          secret: resource.secret_value || '',
+          notes: resource.notes || '',
+        })),
       tasks: tasks
         .filter((task) => task.project_id === project.id)
         .map((task) => ({
@@ -145,6 +169,30 @@ const persistWorkspace = async (data) => {
   if (projectError) throw projectError;
   const projectId = new Map((projectRows || []).map((row) => [row.client_key, row.id]));
 
+  const resourceRows = [];
+  for (const project of projects) {
+    const dbProjectId = projectId.get(project.id);
+    for (const resource of project.resources || []) {
+      resourceRows.push({
+        owner_id: ownerId,
+        project_id: dbProjectId,
+        client_key: resource.id,
+        resource_type: resource.type || 'other',
+        label: resource.label || 'Recurso',
+        url: resource.url || null,
+        username: resource.username || null,
+        secret_value: resource.secret || null,
+        notes: resource.notes || null,
+        updated_at: new Date().toISOString(),
+      });
+    }
+  }
+  if (resourceRows.length) {
+    const { error } = await supabase.from('project_resources').upsert(resourceRows, { onConflict: 'owner_id,client_key' });
+    if (error) throw error;
+  }
+  await deleteMissing('project_resources', ownerId, resourceRows.map((resource) => resource.client_key));
+
   const areaRows = [];
   for (const project of projects) {
     const dbProjectId = projectId.get(project.id);
@@ -217,6 +265,20 @@ const persistWorkspace = async (data) => {
     if (error) throw error;
   }
   await deleteMissing('project_payments', ownerId, paymentRows.map((payment) => payment.client_key));
+
+  const inboxRows = (data.inbox || []).map((note) => ({
+    owner_id: ownerId,
+    client_key: note.id,
+    project_id: note.projectId ? projectId.get(note.projectId) || null : null,
+    content: note.content,
+    status: note.status || 'inbox',
+    updated_at: new Date().toISOString(),
+  }));
+  if (inboxRows.length) {
+    const { error } = await supabase.from('inbox_notes').upsert(inboxRows, { onConflict: 'owner_id,client_key' });
+    if (error) throw error;
+  }
+  await deleteMissing('inbox_notes', ownerId, inboxRows.map((note) => note.client_key));
 };
 
 const seedIfNeeded = async (ownerId) => {
@@ -228,10 +290,31 @@ const seedIfNeeded = async (ownerId) => {
   const { count, error } = await supabase
     .from('projects').select('id', { count: 'exact', head: true }).eq('owner_id', ownerId);
   if (error) throw error;
-  if (!count) await persistWorkspace(clone(mockData));
+  if (!count) await persistWorkspace({ ...clone(mockData), inbox: [] });
 
   const result = await supabase.from('profiles').upsert({ owner_id: ownerId, workspace_initialized: true }, { onConflict: 'owner_id' });
   if (result.error) throw result.error;
+};
+
+const performSave = async (snapshot) => {
+  try {
+    emitSyncStatus('saving');
+    await persistWorkspace(snapshot);
+    emitSyncStatus('synced');
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  } catch (error) {
+    pendingSave = clone(snapshot);
+    emitSyncStatus('error');
+    console.error('No se pudo sincronizar el workspace con Supabase', error);
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(() => {
+      if (!pendingSave) return;
+      const retrySnapshot = pendingSave;
+      pendingSave = null;
+      performSave(retrySnapshot);
+    }, 5000);
+  }
 };
 
 export const dataService = {
@@ -245,17 +328,10 @@ export const dataService = {
     pendingSave = clone(data);
     emitSyncStatus('pending');
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(async () => {
+    saveTimer = setTimeout(() => {
       const snapshot = pendingSave;
       pendingSave = null;
-      try {
-        emitSyncStatus('saving');
-        await persistWorkspace(snapshot);
-        emitSyncStatus('synced');
-      } catch (error) {
-        emitSyncStatus('error');
-        console.error('No se pudo sincronizar el workspace con Supabase', error);
-      }
+      if (snapshot) performSave(snapshot);
     }, 650);
     return data;
   },
