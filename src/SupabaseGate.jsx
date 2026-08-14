@@ -115,7 +115,7 @@ export default function SupabaseGate({ children }) {
       <div className="login-orbit orbit-one"/><div className="login-orbit orbit-two"/>
       <section className="login-card">
         <div className="login-brand"><span className="brand-mark">VX</span><div><strong>Vencodex</strong><small>Internal workspace</small></div></div>
-        <div className="login-copy"><span className="mini-label">✦ WORKSPACE PRIVADO</span><h1>Todo tu trabajo,<br/><span>en un solo lugar.</span></h1><p>Proyectos, finanzas y equipo protegidos con tu sesión de Supabase.</p></div>
+        <div className="login-copy"><span className="mini-label">✦ WORKSPACE PRIVADO</span><h1>Todo Vencodex,<br/><span>en un solo lugar.</span></h1><p>Proyectos, operación, cobros y equipo protegidos con tu sesión de Supabase.</p></div>
         {mode === 'forgot' ? <form onSubmit={sendRecovery} className="login-form">
           <label>Correo<input value={email} onChange={(e) => { setEmail(e.target.value); setError(''); setMessage(''); }} autoFocus autoComplete="email" type="email" placeholder="tu@correo.com" required/></label>
           {error && <div className="login-error">{error}</div>}
