@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import BriefingInbox from './BriefingInbox';
 
 const money = (value) => new Intl.NumberFormat('es-EC', {
   style: 'currency',
@@ -64,7 +65,7 @@ function Insight({ icon, title, value, detail, tone = 'default', action, onClick
   </button>;
 }
 
-export default function CompanyDashboard({ data, onProject, onNewProject }) {
+export default function CompanyDashboard({ data, onProject, onNewProject, onAddInbox, onArchiveInbox, onConvertInbox }) {
   const activeProjects = useMemo(() => data.projects.filter((project) => project.status !== 'archived'), [data.projects]);
 
   const finance = useMemo(() => {
@@ -155,6 +156,8 @@ export default function CompanyDashboard({ data, onProject, onNewProject }) {
       <Metric label="Proyectos activos" value={String(activeProjects.length)} detail={`${openTasks.length} tareas abiertas`} />
     </section>
 
+    <BriefingInbox data={data} onProject={onProject} onAdd={onAddInbox} onArchive={onArchiveInbox} onConvert={onConvertInbox}/>
+
     <section className="vx2-section">
       <div className="vx2-section-head">
         <div><span className="vx2-kicker dark">ORGANIZACIÓN</span><h3>Lo que conviene ordenar</h3><p>Son datos incompletos o frentes que pueden hacerte perder control más adelante.</p></div>
@@ -172,7 +175,7 @@ export default function CompanyDashboard({ data, onProject, onNewProject }) {
       <div className="vx2-section vx2-deliveries">
         <div className="vx2-section-head compact"><div><span className="vx2-kicker dark">AGENDA</span><h3>Próximas entregas</h3></div></div>
         <div className="vx2-delivery-list">
-          {upcomingProjects.map(({ project, days }) => <button key={project.id} onClick={() => onProject(project.id)}>
+          {upcomingProjects.map(({ project }) => <button key={project.id} onClick={() => onProject(project.id)}>
             <span className="vx2-delivery-date"><b>{new Date(`${project.dueDate}T12:00:00`).getDate()}</b><small>{new Intl.DateTimeFormat('es-EC',{month:'short'}).format(new Date(`${project.dueDate}T12:00:00`))}</small></span>
             <span className="vx2-delivery-copy"><strong>{project.name}</strong><small>{project.client || 'Proyecto interno'}</small></span>
             <Deadline date={project.dueDate}/><span className="vx2-arrow">→</span>
