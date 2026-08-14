@@ -1,0 +1,208 @@
+/* Task table — Vencodex operational polish */
+.task-table-wrap{
+  overflow:auto;
+  min-height:270px;
+  scrollbar-gutter:stable;
+}
+
+.task-table{
+  width:100%;
+  min-width:1180px;
+  table-layout:fixed;
+  border-collapse:separate;
+  border-spacing:0;
+}
+
+.task-table th{
+  padding:12px 14px;
+  background:#f7f9fb;
+  color:#7b8794;
+  border-bottom:1px solid #e5e9ef;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.11em;
+}
+
+.task-table td{
+  height:68px;
+  padding:12px 14px;
+  color:#485563;
+  border-bottom:1px solid #edf0f4;
+  font-size:10px;
+  vertical-align:middle;
+  background:#fff;
+}
+
+.task-table tbody tr{
+  transition:background .16s ease, box-shadow .16s ease;
+}
+
+.task-table tbody tr:hover td{
+  background:#f8fbff;
+}
+
+.task-table tbody tr:hover td:first-child{
+  box-shadow:inset 3px 0 0 #2859f6;
+}
+
+.task-table th:first-child,.task-table td:first-child{padding-left:20px;width:390px}
+.task-table th:nth-child(2),.task-table td:nth-child(2){width:92px}
+.task-table th:nth-child(3),.task-table td:nth-child(3){width:100px}
+.task-table th:nth-child(4),.task-table td:nth-child(4){width:125px}
+.task-table th:nth-child(5),.task-table td:nth-child(5){width:108px}
+.task-table th:nth-child(6),.task-table td:nth-child(6){width:74px;text-align:center}
+.task-table th:nth-child(7),.task-table td:nth-child(7){width:132px}
+.task-table th:nth-child(8),.task-table td:nth-child(8){width:82px}
+.task-table th:nth-child(9),.task-table td:nth-child(9){width:46px}
+
+.task-name{
+  display:grid;
+  grid-template-columns:8px minmax(0,1fr) 22px;
+  align-items:start;
+  gap:10px;
+  width:100%;
+  max-width:none;
+  min-width:0;
+}
+
+.task-state-dot{
+  width:7px;
+  height:7px;
+  margin-top:6px;
+  flex:none;
+}
+
+/* Important: the second span is the task copy. The last span is the risk marker. */
+.task-name>span:nth-child(2){
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  width:100%;
+}
+
+.task-name b{
+  display:block;
+  color:#091827;
+  font:700 11.5px/1.35 'DM Sans',system-ui,sans-serif;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.task-name small{
+  display:block;
+  margin-top:4px;
+  color:#8a96a3;
+  font-size:9.5px;
+  line-height:1.4;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.task-risk-dot{
+  align-self:start;
+  width:20px;
+  height:20px;
+  margin:0;
+  border-radius:7px;
+  display:grid!important;
+  place-items:center;
+  flex:none;
+  font-size:0!important;
+  line-height:1;
+  background:#f0f3f6;
+  border:1px solid #e3e8ee;
+}
+
+.task-risk-dot::after{
+  content:'';
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:#98a3ae;
+  box-shadow:0 0 0 3px rgba(152,163,174,.10);
+}
+.task-risk-dot.risk-green{background:rgba(41,242,167,.09);border-color:rgba(41,242,167,.20)}
+.task-risk-dot.risk-green::after{background:#1dbb80;box-shadow:0 0 0 3px rgba(29,187,128,.11)}
+.task-risk-dot.risk-amber{background:#fff8e8;border-color:#f4dfaa}
+.task-risk-dot.risk-amber::after{background:#d99a20;box-shadow:0 0 0 3px rgba(217,154,32,.12)}
+.task-risk-dot.risk-red{background:#fff0f1;border-color:#f1c8cc}
+.task-risk-dot.risk-red::after{background:#d94d5b;box-shadow:0 0 0 3px rgba(217,77,91,.12)}
+
+.area-tag{
+  padding:5px 8px;
+  border-radius:8px;
+  border:1px solid #e3e8ee;
+  background:#f8fafc;
+  color:#526171;
+  font-size:9px;
+  font-weight:650;
+}
+
+.status-pill{
+  padding:6px 9px;
+  font-size:9px;
+  font-weight:700;
+}
+
+.status-pill.blue{background:#edf2ff;color:#2859f6}
+.status-pill.green{background:rgba(41,242,167,.12);color:#12895e}
+.status-pill.amber{background:#fff5df;color:#a36c1d}
+
+.assignee{
+  gap:7px;
+  font-size:9.5px;
+  color:#4e5b68;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.assignee i{
+  width:25px;
+  height:25px;
+  border-radius:8px;
+  background:#eef3f8;
+  color:#2859f6;
+  font-size:7.5px;
+}
+
+.empty-value{font-size:9.5px;color:#a1aab4}
+
+.effort-badge{
+  min-width:28px;
+  height:26px;
+  border-radius:8px;
+  background:#f0f3f6;
+  color:#526171;
+  font-size:9.5px;
+}
+
+.table-progress{
+  min-width:0;
+  width:100%;
+  gap:8px;
+}
+.table-progress .progress-track{
+  width:82px;
+  height:6px;
+  background:#e9edf2;
+}
+.table-progress .progress-track>span{
+  background:linear-gradient(90deg,#2859f6,#29f2a7);
+}
+.table-progress>span{
+  min-width:28px;
+  color:#6f7c89;
+  font-size:9px;
+  font-weight:700;
+}
+
+.task-table .icon-button{
+  width:30px;
+  height:30px;
+}
+
+@media(max-width:1100px){
+  .task-table{min-width:1120px}
+  .task-table th:first-child,.task-table td:first-child{width:340px}
+}
