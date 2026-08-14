@@ -73,3 +73,5 @@ if (!main.includes("import './calendarPolish.css';")) {
   main = main.replace("import './jarvisPolish.css';\n", "import './jarvisPolish.css';\nimport './calendarPolish.css';\n");
 }
 fs.writeFileSync(mainPath, main);
+
+// trigger calendar wiring
