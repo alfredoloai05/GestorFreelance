@@ -4,6 +4,7 @@ import { supabase } from './supabaseClient';
 const clone = (value) => structuredClone(value);
 let saveTimer = null;
 let pendingSave = null;
+const emitSyncStatus = (status) => { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('vencodex-sync-status', { detail: status })); };
 
 const getUser = async () => {
   const { data: { user }, error } = await supabase.auth.getUser();
@@ -240,13 +241,17 @@ export const dataService = {
 
   async save(data) {
     pendingSave = clone(data);
+    emitSyncStatus('pending');
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
       const snapshot = pendingSave;
       pendingSave = null;
       try {
+        emitSyncStatus('saving');
         await persistWorkspace(snapshot);
+        emitSyncStatus('synced');
       } catch (error) {
+        emitSyncStatus('error');
         console.error('No se pudo sincronizar el workspace con Supabase', error);
       }
     }, 650);
