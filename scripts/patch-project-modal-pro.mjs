@@ -12,3 +12,4 @@ source=source.replace('<strong>Vencodex</strong><small>Workspace</small>','<stro
 source=source.replace('Las personas detrás del trabajo.','Tu equipo de trabajo.');
 source=source.replace('Agrega colaboradores una sola vez y asígnalos después a cualquier tarea.','Aquí tienes a las personas que trabajan contigo. Asígnalas a las tareas cuando las necesites.');
 fs.writeFileSync(path,source);
+// one-time wiring patch
