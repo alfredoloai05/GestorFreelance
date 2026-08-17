@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import SupabaseGate from './SupabaseGate';
+import './smartTaskImport';
 import './styles.css';
 import './enhancements.css';
 import './projectPolish.css';
